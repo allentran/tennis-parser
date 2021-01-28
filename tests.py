@@ -1,11 +1,75 @@
 import unittest
 
-from parser import Shot
+from parser import Shot, GroundStroke, Serve, ServeDirection, StrokeType, Terminal, ErrorType, ShotDirection, Return, ReturnDepth, CourtPosition
 
 
 class ParserTests(unittest.TestCase):
 
     def test_shots(self):
+        self.assertEqual(
+            Shot.parse_shot_string('4'),
+            Serve(serve_direction=ServeDirection.wide)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('f'),
+            GroundStroke(StrokeType.forehand)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('b'),
+            GroundStroke(StrokeType.backhand)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('m'),
+            GroundStroke(StrokeType.backhand_lob)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('f*'),
+            GroundStroke(StrokeType.forehand, terminal=Terminal.winner)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('on@'),
+            GroundStroke(StrokeType.smash, error=ErrorType.net, terminal=Terminal.error)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('s28'),
+            Return(
+                return_depth=ReturnDepth.middle,
+                stroke_type=StrokeType.backhand_slice,
+                shot_direction=ShotDirection.middle
+            )
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('v1'),
+            GroundStroke(stroke_type=StrokeType.volley, shot_direction=ShotDirection.fh)
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('f-3*'),
+            GroundStroke(
+                stroke_type=StrokeType.forehand,
+                shot_direction=ShotDirection.bh,
+                court_position=CourtPosition.net,
+                terminal=Terminal.winner
+            )
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('b1w#'),
+            GroundStroke(
+                stroke_type=StrokeType.backhand,
+                shot_direction=ShotDirection.fh,
+                error=ErrorType.wide,
+                terminal=Terminal.forced_error
+            )
+        )
+        self.assertEqual(
+            Shot.parse_shot_string('o=1'),
+            GroundStroke(
+                stroke_type=StrokeType.smash,
+                court_position=CourtPosition.baseline,
+                shot_direction=ShotDirection.fh,
+            )
+        )
+
+    def test_shots_strs(self):
         s = '4ffbbf*'
         shot_strs = Shot.segment_string(s)
         self.assertEqual(len(shot_strs), 6)
