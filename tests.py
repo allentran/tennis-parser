@@ -1,9 +1,20 @@
 import unittest
 
+import pandas as pd
+
 from parser import Shot, GroundStroke, Serve, ServeDirection, StrokeType, Terminal, ErrorType, ShotDirection, Return, ReturnDepth, CourtPosition
 
 
 class ParserTests(unittest.TestCase):
+
+    def test_real_data(self):
+        df = pd.read_csv('test_data/points.csv', encoding='latin1')
+        for s in df['1st']:
+            shots = Shot.parse_shots_string(s)
+            self.assertGreaterEqual(len(shots), 1)
+        for s in df[df['2nd'].notnull()]['2nd']:
+            shots = Shot.parse_shots_string(s)
+            self.assertGreaterEqual(len(shots), 1)
 
     def test_shots(self):
         self.assertEqual(
