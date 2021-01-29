@@ -3,6 +3,8 @@ from __future__ import annotations
 from enum import Enum
 from typing import List
 
+import pandas as pd
+
 
 class ErrorType(Enum):
     net = 'n'
@@ -61,12 +63,53 @@ class Shot(object):
         self.serve_direction = None
         self.stroke_type = None
         self.return_depth = None
+        self.is_return = None
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
             return self.__dict__ == other.__dict__
         else:
             return False
+
+    @staticmethod
+    def explode_df(df: pd.DataFrame) -> pd.DataFrame:
+        df['has_second'] = False
+        df.loc[df['2nd'].notnull(), 'has_second'] = True
+        shot_dicts = []
+        for row in df.itertuples():
+            match_details = {
+                'match_id': row.match_id,
+                'pt_nbr': row.Pt,
+                'first_pt': True
+            }
+            shots = Shot.parse_shots_string(row._15)
+            for shot_sequence_nbr, shot in enumerate(shots):
+                shot_dict = shot.to_dict()
+                shot_dict.update(match_details)
+                shot_dict['shot_sequence_nbr'] = shot_sequence_nbr
+                shot_dicts.append(shot_dict)
+
+            if row.has_second:
+
+                shots = Shot.parse_shots_string(row._16)
+                for shot_sequence_nbr, shot in enumerate(shots):
+                    shot_dict = shot.to_dict()
+                    shot_dict.update(match_details)
+                    shot_dict['shot_sequence_nbr'] = shot_sequence_nbr
+                    shot_dict['first_pt'] = False
+                    shot_dicts.append(shot_dict)
+        return pd.DataFrame(shot_dicts)
+
+    def to_dict(self):
+        return {
+            'court_position': None if self.court_position is None else self.court_position.name,
+            'terminal': None if self.terminal is None else self.terminal.name,
+            'error_type': None if self.error_type is None else self.error_type.name,
+            'serve_direction': None if self.serve_direction is None else self.serve_direction.name,
+            'stroke_type': None if self.stroke_type is None else self.stroke_type.name,
+            'return_depth': None if self.return_depth is None else self.return_depth.name,
+            'is_return': False if not self.is_return else True
+        }
 
     @staticmethod
     def parse_shots_string(s: str) -> List[Shot]:
@@ -193,3 +236,4 @@ class Return(GroundStroke):
     def __init__(self, return_depth: ReturnDepth = None, stroke_type: StrokeType = None, shot_direction: ShotDirection = None, court_position: CourtPosition = None, terminal=None, error=None):
         super().__init__(stroke_type, shot_direction, court_position, terminal, error)
         self.return_depth = return_depth
+        self.is_return = True

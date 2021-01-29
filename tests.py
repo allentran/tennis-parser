@@ -7,6 +7,12 @@ from parser import Shot, GroundStroke, Serve, ServeDirection, StrokeType, Termin
 
 class ParserTests(unittest.TestCase):
 
+    def test_explode(self):
+        df = pd.read_csv('test_data/points.csv', encoding='latin1')
+        explode_df = Shot.explode_df(df.sample(200))
+        self.assertTrue((explode_df['first_pt'] == False).any())
+        self.assertFalse((explode_df['first_pt'] == False).all())
+
     def test_real_data(self):
         df = pd.read_csv('test_data/points.csv', encoding='latin1')
         for s in df['1st']:
