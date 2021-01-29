@@ -1,5 +1,4 @@
 
-from __future__ import annotations
 from enum import Enum
 from typing import List
 
@@ -11,6 +10,7 @@ class ErrorType(Enum):
     wide = 'w'
     deep = 'd'
     wide_and_deep = 'x'
+    foot_fault = 'g'
 
 
 class Terminal(Enum):
@@ -24,22 +24,34 @@ class StrokeType(Enum):
     backhand = 'b'
     forehand_slice = 'r'
     backhand_slice = 's'
-    volley = 'v'
+    forehand_volley = 'v'
+    backhand_volley = 'z'
     backhand_lob = 'm'
     lob = 'l'
     smash = 'o'
+    backhand_smash = 'p'
+    forehand_drop = 'u'
+    backhand_drop = 'y'
+    forehand_half_volley = 'h'
+    backhand_half_volley = 'i'
+    forehand_swinging_volley = 'j'
+    backhand_swinging_volley = 'k'
+    trickshot = 't'
+    unknown = 'q'
 
 
 class ServeDirection(Enum):
     down_t = 6
     body = 5
     wide = 4
+    unknown = 0
 
 
 class ShotDirection(Enum):
     middle = 2
     bh = 3
     fh = 1
+    unknown = 0
 
 
 class ReturnDepth(Enum):
@@ -56,10 +68,11 @@ class CourtPosition(Enum):
 
 class Shot(object):
 
-    def __init__(self, court_position: CourtPosition, terminal: Terminal = None, error: ErrorType = None):
+    def __init__(self, court_position: CourtPosition, terminal: Terminal = None, error: ErrorType = None, raw_string=None):
         self.court_position = court_position
         self.terminal = terminal
         self.error_type = error
+        self.raw_string = raw_string
         self.serve_direction = None
         self.stroke_type = None
         self.return_depth = None
@@ -67,7 +80,9 @@ class Shot(object):
 
     def __eq__(self, other):
         if isinstance(other, self.__class__):
-            return self.__dict__ == other.__dict__
+            self_dict = {k: v for k, v in self.__dict__.items() if k != 'raw_string'}
+            other_dict = {k: v for k, v in other.__dict__.items() if k != 'raw_string'}
+            return self_dict == other_dict
         else:
             return False
 
@@ -108,11 +123,12 @@ class Shot(object):
             'serve_direction': None if self.serve_direction is None else self.serve_direction.name,
             'stroke_type': None if self.stroke_type is None else self.stroke_type.name,
             'return_depth': None if self.return_depth is None else self.return_depth.name,
-            'is_return': False if not self.is_return else True
+            'is_return': False if not self.is_return else True,
+            'raw_string': self.raw_string
         }
 
     @staticmethod
-    def parse_shots_string(s: str) -> List[Shot]:
+    def parse_shots_string(s: str) -> List['Shot']:
         segmented_strs = Shot.segment_string(s)
         shots = []
         for position, sub_str in enumerate(segmented_strs):
@@ -121,42 +137,42 @@ class Shot(object):
         return shots
 
     @staticmethod
-    def parse_shot_string(s: str, is_return=False) -> Shot:
+    def parse_shot_string(s: str, is_return=False) -> 'Shot':
         assert len(s) > 0
 
         terminal = None
-        for c in ['@', '#', '*']:
-            if c in s:
+        for c in [t.value for t in Terminal]:
+            if str(c) in s:
                 terminal = Terminal(c)
 
         stroke_type = None
-        for c in ['f', 'b', 'r', 's', 'v', 'm', 'l', 'o']:
-            if c in s:
+        for c in [st.value for st in StrokeType]:
+            if str(c) in s:
                 stroke_type = StrokeType(c)
 
         return_depth = None
-        for c in ['7', '8', '9']:
-            if c in s:
+        for c in [rt.value for rt in ReturnDepth]:
+            if str(c) in s:
                 return_depth = ReturnDepth(int(c))
 
         court_position = None
-        for c in ['+', '-', '=']:
-            if c in s:
+        for c in [cp.value for cp in CourtPosition]:
+            if str(c) in s:
                 court_position = CourtPosition(c)
 
         shot_direction = None
-        for c in ['1', '2', '3']:
-            if c in s:
+        for c in [sd.value for sd in ShotDirection]:
+            if str(c) in s:
                 shot_direction = ShotDirection(int(c))
 
         serve_direction = None
-        for c in ['4', '5', '6']:
-            if c in s:
+        for c in [sd.value for sd in ServeDirection]:
+            if str(c) in s:
                 serve_direction = ServeDirection(int(c))
 
         error = None
-        for c in ['n', 'w', 'd', 'x']:
-            if c in s:
+        for c in [e.value for e in ErrorType]:
+            if str(c) in s:
                 error = ErrorType(c)
 
         if is_return or return_depth is not None:
@@ -166,14 +182,16 @@ class Shot(object):
                 shot_direction=shot_direction,
                 court_position=court_position,
                 terminal=terminal,
-                error=error
+                error=error,
+                raw_string=s
             )
         if serve_direction is not None:
             return Serve(
                 court_position=court_position,
                 terminal=terminal,
                 serve_direction=serve_direction,
-                error=error
+                error=error,
+                raw_string=s
             )
         else:
             return GroundStroke(
@@ -181,7 +199,8 @@ class Shot(object):
                 shot_direction=shot_direction,
                 court_position=court_position,
                 terminal=terminal,
-                error=error
+                error=error,
+                raw_string=s
             )
 
     @staticmethod
@@ -194,21 +213,21 @@ class Shot(object):
             if curr_pos == 0:
                 continue
             else:
-                if c in {4, 5, 6}:  # serve
+                if c in set([str(serve_direction.value) for serve_direction in ServeDirection]):
                     curr_shot_str = c
-                elif c in {'@', '#', '*'}:  # current point is terminal
+                elif c in set([str(terminal.value) for terminal in Terminal]):
                     curr_shot_str += c
-                elif c in {'f', 'b', 's', 'r', 'v', 'l', 'o', 'm'}:  #
+                elif c in set([str(stroke_type.value) for stroke_type in StrokeType]):
                     shot_strs.append(s[start_pos: curr_pos])
                     start_pos = curr_pos
                     curr_shot_str = c
-                elif c in {'1', '2', '3'}:  # direction annotation
+                elif c in set([str(sd.value) for sd in ShotDirection]):
                     curr_shot_str += c
-                elif c in {'n', 'w', 'd', 'x'}:  # error annotation
+                elif c in set([str(e.value) for e in ErrorType]):
                     curr_shot_str += c
-                elif c in {'7', '8', '9'}:  # return depth annotation
+                elif c in set([str(r.value) for r in ReturnDepth]):
                     curr_shot_str += c
-                elif c in {'+', '-', '='}:  # court position annotation
+                elif c in set([str(cp.value) for cp in CourtPosition]):
                     curr_shot_str += c
         else:
             shot_strs.append(s[start_pos:])
@@ -218,22 +237,22 @@ class Shot(object):
 
 class Serve(Shot):
 
-    def __init__(self,serve_direction: ServeDirection,  court_position: CourtPosition = None, terminal=None, error=None):
-        super().__init__(court_position, terminal, error)
+    def __init__(self,serve_direction: ServeDirection,  court_position: CourtPosition = None, terminal=None, error=None, raw_string=None):
+        super().__init__(court_position, terminal, error, raw_string=raw_string)
         self.serve_direction = serve_direction
 
 
 class GroundStroke(Shot):
 
-    def __init__(self, stroke_type: StrokeType, shot_direction: ShotDirection = None, court_position: CourtPosition = None, terminal=None, error=None):
-        super().__init__(court_position, terminal, error)
+    def __init__(self, stroke_type: StrokeType, shot_direction: ShotDirection = None, court_position: CourtPosition = None, terminal=None, error=None, raw_string=None):
+        super().__init__(court_position, terminal, error, raw_string=raw_string)
         self.stroke_type = stroke_type
         self.shot_direction = shot_direction
 
 
 class Return(GroundStroke):
 
-    def __init__(self, return_depth: ReturnDepth = None, stroke_type: StrokeType = None, shot_direction: ShotDirection = None, court_position: CourtPosition = None, terminal=None, error=None):
-        super().__init__(stroke_type, shot_direction, court_position, terminal, error)
+    def __init__(self, return_depth: ReturnDepth = None, stroke_type: StrokeType = None, shot_direction: ShotDirection = None, court_position: CourtPosition = None, terminal=None, error=None, raw_string=None):
+        super().__init__(stroke_type, shot_direction, court_position, terminal, error, raw_string=raw_string)
         self.return_depth = return_depth
         self.is_return = True

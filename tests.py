@@ -2,7 +2,7 @@ import unittest
 
 import pandas as pd
 
-from parser import Shot, GroundStroke, Serve, ServeDirection, StrokeType, Terminal, ErrorType, ShotDirection, Return, ReturnDepth, CourtPosition
+from tmcp_parser import Shot, GroundStroke, Serve, ServeDirection, StrokeType, Terminal, ErrorType, ShotDirection, Return, ReturnDepth, CourtPosition
 
 
 class ParserTests(unittest.TestCase):
@@ -57,7 +57,7 @@ class ParserTests(unittest.TestCase):
         )
         self.assertEqual(
             Shot.parse_shot_string('v1'),
-            GroundStroke(stroke_type=StrokeType.volley, shot_direction=ShotDirection.fh)
+            GroundStroke(stroke_type=StrokeType.forehand_volley, shot_direction=ShotDirection.fh)
         )
         self.assertEqual(
             Shot.parse_shot_string('f-3*'),
@@ -87,6 +87,14 @@ class ParserTests(unittest.TestCase):
         )
 
     def test_shots_strs(self):
+        s = 'f29u27y-37'
+        shot_strs = Shot.segment_string(s)
+        self.assertEqual(len(shot_strs), 3)
+        self.assertEqual(shot_strs[0], 'f29')
+        self.assertEqual(shot_strs[1], 'u27')
+        self.assertEqual(shot_strs[2], 'y-37')
+
+
         s = '4ffbbf*'
         shot_strs = Shot.segment_string(s)
         self.assertEqual(len(shot_strs), 6)
